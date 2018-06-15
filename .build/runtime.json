@@ -1,0 +1,8 @@
+{
+    "azureCliLocation": "C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd",
+    "iotHubName": "pf-iothub",
+    "subscription": "470b9b9d-8b34-43fd-8d53-6af7e4eeccb7",
+    "resourceGroup": "systemy-wbudowane",
+    "deviceConnectionString": "HostName=pf-iothub.azure-devices.net;DeviceId=AZ3166;SharedAccessKey=Pz8SZ99zUW/9o0UNXOjGF61DoXMBVDm4rfvNSG4Xnc4=",
+    "deviceId": "AZ3166"
+}

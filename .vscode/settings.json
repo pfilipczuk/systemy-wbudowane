@@ -1,0 +1,11 @@
+{
+  "files.associations": {
+    "ios": "cpp",
+    "chrono": "cpp",
+    "xhash": "cpp",
+    "xtree": "cpp",
+    "xutility": "cpp",
+    "xlocale": "cpp",
+    "future": "cpp"
+  }
+}

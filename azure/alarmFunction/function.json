@@ -1,0 +1,22 @@
+{
+    "bindings": [
+      {
+        "type": "eventHubTrigger",
+        "name": "eventHubMessage",
+        "direction": "in",
+        "path": "%eventHubConnectionPath%",
+        "connection": "eventHubConnectionString",
+        "cardinality": "one"
+      },
+      {
+        "name": "$return",
+        "type": "sendGrid",
+        "direction": "out",
+        "apiKey": "mySendGridKey",
+        "to": "%toEmail%",
+        "from": "%fromEmail%",
+        "subject": "Door Status Changed"
+      }
+    ],
+    "disabled": false
+  }
