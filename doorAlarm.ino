@@ -7,8 +7,8 @@
 
 #define DELTA 300
 #define DELAY 500
-#define INIT_TIME 5
-#define TIME_LIMIT 10
+#define INIT_TIME 6
+#define ALERT_TIME_LIMIT 10
 
 static Timer timer;
 
@@ -21,7 +21,6 @@ enum STATUS
 
 static STATUS status = Idle;
 static bool azureConnected = false;
-static bool doorOpened = false;
 static bool messageSent = false;
 
 static DevI2C *i2c;
@@ -96,7 +95,7 @@ static void DoIdle()
   Screen.print(1, "Press A to init magnetometer", true);
   if (digitalRead(USER_BUTTON_A) == LOW)
   {
-    InitMagnetometer();
+    InitializeMagnetometer();
     status = DoorClosed;
   }
 }
@@ -117,7 +116,13 @@ static void DoDoorClosed()
   sprintf(buffer, "z:  %d", offsets[2] - axes[2]);
   Screen.print(3, buffer);
 
-  CheckMagnetometerStatus();
+  if (abs(offsets[0] - axes[0]) > DELTA || abs(offsets[1] - axes[1]) > DELTA || abs(offsets[2] - axes[2]) > DELTA)
+  {
+    status = DoorOpened;    
+    messageSent = false;
+    timer.reset();
+    timer.start();
+  }
 }
 
 static void DoDoorOpened()
@@ -131,10 +136,10 @@ static void DoDoorOpened()
   }
 
   Screen.print(0, "Door opened!");
-  if (timer.read() <= TIME_LIMIT)
+  if (timer.read() <= ALERT_TIME_LIMIT)
   {
     char buffer[50];
-    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", TIME_LIMIT - int(timer.read()));
+    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", ALERT_TIME_LIMIT - int(timer.read()));
     Screen.print(1, buffer, true);
   }
   else
@@ -142,13 +147,14 @@ static void DoDoorOpened()
     if (!messageSent && DevKitMQTTClient_SendEvent("Wild Pikachu appeared"))
     {
       messageSent = true;
-      Screen.print(1, "Alert sent");
+      Screen.clean();
+      Screen.print(0, "Alert sent!");
       timer.stop();
     }
   }
 }
 
-static void InitMagnetometer()
+static void InitializeMagnetometer()
 {
   Screen.clean();
   lis2mdl->getMAxes(axes);
@@ -189,21 +195,5 @@ static void InitMagnetometer()
       offsets[1] = axes[1];
       offsets[2] = axes[2];
     }
-  }
-}
-
-void CheckMagnetometerStatus()
-{
-  if (abs(offsets[0] - axes[0]) < DELTA && abs(offsets[1] - axes[1]) < DELTA && abs(offsets[2] - axes[2]) < DELTA)
-  {
-    Screen.print(0, "Door closed");
-    doorOpened = false;
-    messageSent = false;
-  }
-  else
-  {
-    status = DoorOpened;
-    timer.reset();
-    timer.start();
   }
 }
