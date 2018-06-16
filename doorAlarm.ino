@@ -7,7 +7,7 @@
 
 #define DELTA 300
 #define DELAY 500
-#define INIT_TIME 6
+#define INIT_TIME 5
 #define ALERT_TIME_LIMIT 10
 
 static Timer timer;
@@ -191,6 +191,7 @@ static void InitializeMagnetometer()
     }
     else
     {
+      timer.reset();
       offsets[0] = axes[0];
       offsets[1] = axes[1];
       offsets[2] = axes[2];
