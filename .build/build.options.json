@@ -5,6 +5,6 @@
   "hardwareFolders": "C:\\Program Files (x86)\\Arduino\\hardware,C:\\Users\\Pavlo\\AppData\\Local\\Arduino15\\packages",
   "otherLibrariesFolders": "C:\\Users\\Pavlo\\Documents\\Arduino\\libraries",
   "runtime.ide.version": "10801",
-  "sketchLocation": "C:\\Users\\Pavlo\\source\\repos\\systemy-wbudowane\\doorAlarm\\burglaryAlarm.ino",
+  "sketchLocation": "C:\\Users\\Pavlo\\source\\repos\\systemy-wbudowane\\doorAlarm\\doorAlarm.ino",
   "toolsFolders": "C:\\Program Files (x86)\\Arduino\\tools-builder,C:\\Program Files (x86)\\Arduino\\hardware\\tools\\avr,C:\\Users\\Pavlo\\AppData\\Local\\Arduino15\\packages"
 }

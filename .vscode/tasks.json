@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "taskName": "cloud-provision",
+            "label": "cloud-provision",
             "command": "node",
             "windows": {
                 "args": ["\"${env:USERPROFILE}\\azure-board-cli\\out\\cli.js\"", "provision", ".bin"],
@@ -27,7 +27,7 @@
             "problemMatcher": []
         },
         {
-            "taskName": "device-upload",
+            "label": "device-upload",
             "command": "node",
             "windows": {
                 "args": ["\"${env:USERPROFILE}\\azure-board-cli\\out\\cli.js\"", "build", ".bin"],
@@ -53,7 +53,7 @@
             "problemMatcher": []
         },
         {
-            "taskName": "config_wifi",
+            "label": "config-wifi",
             "command": "node",
             "windows": {
                 "args": ["\"${env:USERPROFILE}\\azure-board-cli\\out\\cli.js\"", "config_wifi"],
@@ -78,7 +78,7 @@
             "problemMatcher": []
         },
         {
-            "taskName": "config-device-connection",
+            "label": "config-device-connection", 
             "command": "node",
             "windows": {
                 "args": ["\"${env:USERPROFILE}\\azure-board-cli\\out\\cli.js\"", "config_device_connection_string", ".bin"],

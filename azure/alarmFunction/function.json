@@ -1,22 +1,22 @@
 {
-    "bindings": [
-      {
-        "type": "eventHubTrigger",
-        "name": "eventHubMessage",
-        "direction": "in",
-        "path": "%eventHubConnectionPath%",
-        "connection": "eventHubConnectionString",
-        "cardinality": "one"
-      },
-      {
-        "name": "$return",
-        "type": "sendGrid",
-        "direction": "out",
-        "apiKey": "mySendGridKey",
-        "to": "%toEmail%",
-        "from": "%fromEmail%",
-        "subject": "Door Status Changed"
-      }
-    ],
-    "disabled": false
-  }
+  "bindings": [
+    {
+      "type": "eventHubTrigger",
+      "name": "myIoTHubMessage",
+      "direction": "in",
+      "path": "doorAlarm",
+      "connection": "pf-iothub_events_IOTHUB",
+      "cardinality": "one"
+    },
+    {
+      "type": "sendGrid",
+      "name": "$return",
+      "apiKey": "SendGridApiKey",
+      "to": "%target%",
+      "from": "%source%",
+      "subject": "Nastąpiło włamanie",
+      "direction": "out"
+    }
+  ],
+  "disabled": false
+}

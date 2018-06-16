@@ -6,6 +6,9 @@
     "xtree": "cpp",
     "xutility": "cpp",
     "xlocale": "cpp",
-    "future": "cpp"
-  }
+    "future": "cpp",
+    "cstdlib": "cpp"
+  },
+  "azureFunctions.projectRuntime": "~1",
+  "azureFunctions.projectLanguage": "C#"
 }

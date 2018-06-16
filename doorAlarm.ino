@@ -1,134 +1,34 @@
+#include "Arduino.h"
 #include "AZ3166WiFi.h"
 #include "AzureIotHub.h"
 #include "DevKitMQTTClient.h"
 #include "LIS2MDLSensor.h"
 #include "OledDisplay.h"
 
+#define DELTA 300
 #define DELAY 1000
-#define EXPECTED_COUNT 5
+#define INIT_TIME 5
+#define TIME_LIMIT 10
 
-// The magnetometer sensor
+static Timer timer;
+
+enum STATUS
+{
+  Idle,
+  DoorClosed,
+  DoorOpened
+};
+
+static STATUS status = Idle;
+static bool azureConnected = false;
+static bool doorOpened = false;
+static bool messageSent = false;
+
 static DevI2C *i2c;
 static LIS2MDLSensor *lis2mdl;
 
-// Data from magnetometer sensor
+static int offsets[3] = {0, 0, 0};
 static int axes[3];
-static int base_x;
-static int base_y;
-static int base_z;
-
-static bool isOpened = false;
-static bool messageSent = false;
-
-// The open / close status of the door
-static bool preOpened = false;
-
-// Indicate whether DoorMonitorSucceed event has been logged
-static bool telemetrySent = false;
-
-// Indicate whether WiFi is ready
-static bool hasWifi = false;
-
-// Indicate whether IoT Hub is ready
-static bool hasIoTHub = false;
-
-static bool CheckWiFi()
-{
-  return WiFi.begin() == WL_CONNECTED);
-}
-
-// Utilities
-static void InitWiFi()
-{
-  Screen.print(2, "Connecting...");
-
-  if (WiFi.begin() == WL_CONNECTED)
-  {
-    IPAddress ip = WiFi.localIP();
-    Screen.print(1, ip.get_address());
-    hasWifi = true;
-    Screen.print(2, "Running... \r\n");
-  }
-  else
-  {
-    hasWifi = false;
-    Screen.print(1, "No Wi-Fi\r\n ");
-  }
-}
-
-static void InitMagnetometer()
-{
-  Screen.print(2, "Initializing...");
-  i2c = new DevI2C(D14, D15);
-  lis2mdl = new LIS2MDLSensor(*i2c);
-  lis2mdl->init(NULL);
-
-  lis2mdl->getMAxes(axes);
-  base_x = axes[0];
-  base_y = axes[1];
-  base_z = axes[2];
-
-  int count = 0;
-  int delta = 10;
-  char buffer[20];
-  while (true)
-  {
-    delay(DELAY);
-    lis2mdl->getMAxes(axes);
-
-    // Waiting for the data from sensor to become stable
-    if (abs(base_x - axes[0]) < delta && abs(base_y - axes[1]) < delta && abs(base_z - axes[2]) < delta)
-    {
-      count++;
-      if (count >= EXPECTED_COUNT)
-      {
-        // Done
-        Screen.print(0, "Monitoring...");
-        break;
-      }
-    }
-    else
-    {
-      count = 0;
-      base_x = axes[0];
-      base_y = axes[1];
-      base_z = axes[2];
-    }
-    sprintf(buffer, "      %d", EXPECTED_COUNT - count);
-    Screen.print(1, buffer);
-  }
-}
-
-void CheckMagnetometerStatus()
-{
-  char *message;
-  int delta = 300;
-  bool curOpened = false;
-  if (abs(base_x - axes[0]) < delta && abs(base_y - axes[1]) < delta && abs(base_z - axes[2]) < delta)
-  {
-    Screen.print(0, "Door closed");
-    message = "Door closed";
-    curOpened = false;
-  }
-  else
-  {
-    Screen.print(0, "Door opened");
-    message = "Door opened";
-    curOpened = true;
-  }
-  // send message when status change
-  if (curOpened != preOpened)
-  {
-    if (DevKitMQTTClient_SendEvent(message))
-    {
-      if (!telemetrySent)
-      {
-        telemetrySent = true;
-      }
-    }
-    preOpened = curOpened;
-  }
-}
 
 void setup()
 {
@@ -136,53 +36,173 @@ void setup()
 
   Screen.init();
   Screen.print(0, "Setup...");
-  Screen.print(1, "Checking WiFi...");
+
+  Screen.print(1, "WiFi...");
   if (!CheckWiFi())
-  {
     return;
-  }
-
   Screen.print(1, "WiFi OK");
-  IPAddress ip = WiFi.localIP();
-  Screen.print(2, ip.get_address());
-  
-  // IoT hub
-  Screen.print(3, " > IoT Hub");
-  DevKitMQTTClient_SetOption(OPTION_MINI_SOLUTION_NAME, "DoorMonitor");
-  if (!DevKitMQTTClient_Init())
-  {
-    Screen.clean();
-    Screen.print(0, "DoorMonitor");
-    Screen.print(2, "No IoT Hub");
-    hasIoTHub = false;
-    return;
-  }
-  hasIoTHub = true;
 
-  Screen.print(3, " > Magnetometer");
-  InitMagnetometer();
+  Screen.print(2, "Azure IoT...");
+  if (!CheckAzureIoT())
+    return;
+  Screen.print(2, "Azure IoT OK");
+  azureConnected = true;
+
+  pinMode(USER_BUTTON_A, INPUT);
+  pinMode(USER_BUTTON_B, INPUT);
+
+  Screen.print(3, "Magnetometer...");
+  i2c = new DevI2C(D14, D15);
+  lis2mdl = new LIS2MDLSensor(*i2c);
+  if (lis2mdl->init(NULL) != MAGNETO_OK)
+    return;
+  Screen.print(3, "Magnetometer OK");
+  Screen.clean();
 }
 
 void loop()
 {
-  if (hasWifi && hasIoTHub)
+  if (azureConnected)
   {
-    // Get data from magnetometer sensor
-    lis2mdl->getMAxes(axes);
-    Serial.printf("Axes: x - %d, y - %d, z - %d\r\n", axes[0], axes[1], axes[2]);
-
-    char buffer[50];
-
-    sprintf(buffer, "x:  %d", axes[0]);
-    Screen.print(1, buffer);
-
-    sprintf(buffer, "y:  %d", axes[1]);
-    Screen.print(2, buffer);
-
-    sprintf(buffer, "z:  %d", axes[2]);
-    Screen.print(3, buffer);
-
-    CheckMagnetometerStatus();
+    switch (status)
+    {
+    case Idle:
+      DoIdle();
+      break;
+    case DoorClosed:
+      DoDoorClosed();
+      break;
+    case DoorOpened:
+      DoDoorOpened();
+      break;
+    }
   }
   delay(DELAY);
+}
+
+static bool CheckWiFi()
+{
+  return WiFi.begin() == WL_CONNECTED;
+}
+
+static bool CheckAzureIoT()
+{
+  return DevKitMQTTClient_Init();
+}
+
+static void DoIdle()
+{
+  Screen.print(0, "Idle");
+  Screen.print(1, "Press A to init magnetometer", true);
+  if (digitalRead(USER_BUTTON_A) == LOW)
+  {
+    InitMagnetometer();
+    status = DoorClosed;
+  }
+}
+
+static void DoDoorClosed()
+{
+  Screen.print(0, "Door closed");
+  lis2mdl->getMAxes(axes);
+
+  char buffer[50];
+  
+  sprintf(buffer, "x:  %d", offsets[0] - axes[0]);
+  Screen.print(1, buffer);
+
+  sprintf(buffer, "y:  %d", offsets[1] - axes[1]);
+  Screen.print(2, buffer);
+
+  sprintf(buffer, "z:  %d", offsets[2] - axes[2]);
+  Screen.print(3, buffer);
+
+  CheckMagnetometerStatus();
+}
+
+static void DoDoorOpened()
+{
+  if (digitalRead(USER_BUTTON_B) == LOW)
+  {
+    Screen.clean();
+    timer.stop();
+    status = Idle;
+  }
+
+  Screen.print(0, "Door opened!");
+  if (timer.read() <= TIME_LIMIT)
+  {
+    char buffer[50];
+    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", timer.read());
+    Screen.print(1, buffer, true);
+  }
+  else
+  {
+    if (!messageSent && DevKitMQTTClient_SendEvent("Wild Pikachu appeared"))
+    {
+      messageSent = true;
+      Screen.print(1, "Alert sent");
+      timer.stop();
+    }
+  }
+}
+
+static void InitMagnetometer()
+{
+  Screen.clean();
+  lis2mdl->getMAxes(axes);
+  offsets[0] = axes[0];
+  offsets[1] = axes[1];
+  offsets[2] = axes[2];
+
+  timer.reset();
+  timer.start();
+  char buffer[50];
+  int delta = 10;
+  while (true)
+  {
+    sprintf(buffer, "Initializing %d", INIT_TIME - int(timer.read()));
+    Screen.print(0, buffer);
+    sprintf(buffer, "x:  %d", offsets[0] - axes[0]);
+    Screen.print(1, buffer);
+
+    sprintf(buffer, "y:  %d", offsets[1] - axes[1]);
+    Screen.print(2, buffer);
+
+    sprintf(buffer, "z:  %d", offsets[2] - axes[2]);
+    Screen.print(3, buffer);
+    delay(DELAY);
+    lis2mdl->getMAxes(axes);
+
+    if (abs(offsets[0] - axes[0]) < delta && abs(offsets[1] - axes[1]) < delta && abs(offsets[2] - axes[2]) < delta)
+    {
+      if (int(timer.read()) >= INIT_TIME)
+      {
+        timer.stop();
+        break;
+      }
+    }
+    else
+    {
+      offsets[0] = axes[0];
+      offsets[1] = axes[1];
+      offsets[2] = axes[2];
+    }
+  }
+}
+
+void CheckMagnetometerStatus()
+{
+  if (abs(offsets[0] - axes[0]) < DELTA && abs(offsets[1] - axes[1]) < DELTA && abs(offsets[2] - axes[2]) < DELTA)
+  {
+    Screen.print(0, "Door closed");
+    doorOpened = false;
+    messageSent = false;
+  }
+  else
+  {
+    status = DoorOpened;
+    timer.reset();
+    timer.start();
+  }
 }

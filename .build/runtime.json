@@ -3,6 +3,8 @@
     "iotHubName": "pf-iothub",
     "subscription": "470b9b9d-8b34-43fd-8d53-6af7e4eeccb7",
     "resourceGroup": "systemy-wbudowane",
-    "deviceConnectionString": "HostName=pf-iothub.azure-devices.net;DeviceId=AZ3166;SharedAccessKey=Pz8SZ99zUW/9o0UNXOjGF61DoXMBVDm4rfvNSG4Xnc4=",
+    "functionAppName": "alarmFunction",
+    "functionAppResourceGroup": "systemy-wbudowane",
+    "deviceConnectionString": "HostName=pf-iothub.azure-devices.net;DeviceId=AZ3166;SharedAccessKey=iK/H2myyQW5VDNd2ylMwNr2DZ4sNWzTFMcPyzWc3pH0=",
     "deviceId": "AZ3166"
 }

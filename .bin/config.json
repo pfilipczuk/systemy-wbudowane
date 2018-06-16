@@ -1,7 +1,10 @@
 {
   "sketch": "../doorAlarm.ino",
   "config": "deviceConnectionString",
+  "functionRelativePath": "azure",
+  "functionName": "alarmFunction",
   "tasks": {
-    "provision": ["subscription", "iothub", "device"]
+    "provision": ["subscription", "iothub", "device"],
+    "deploy": ["functiondeploy"]
   }
 }
