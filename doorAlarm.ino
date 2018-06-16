@@ -6,7 +6,7 @@
 #include "OledDisplay.h"
 
 #define DELTA 300
-#define DELAY 1000
+#define DELAY 500
 #define INIT_TIME 5
 #define TIME_LIMIT 10
 
@@ -127,13 +127,14 @@ static void DoDoorOpened()
     Screen.clean();
     timer.stop();
     status = Idle;
+    return;
   }
 
   Screen.print(0, "Door opened!");
   if (timer.read() <= TIME_LIMIT)
   {
     char buffer[50];
-    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", timer.read());
+    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", TIME_LIMIT - int(timer.read());
     Screen.print(1, buffer, true);
   }
   else
