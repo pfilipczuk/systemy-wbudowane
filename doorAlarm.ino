@@ -191,6 +191,7 @@ static void InitializeMagnetometer()
     }
     else
     {
+      timer.reset();
       offsets[0] = axes[0];
       offsets[1] = axes[1];
       offsets[2] = axes[2];
