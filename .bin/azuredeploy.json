@@ -4,34 +4,16 @@
             "type": "string",
             "defaultValue": "pf-iothub"
         },
-        "iotHubSku": {
-            "type": "string",
-            "allowedValues": [
-                "F1",
-                "S1",
-                "S2"
-            ],
-            "defaultValue": "F1"
-        },
-        "iotHubUnits": {
-            "type": "int",
-            "minValue": 1,
-            "defaultValue": 1
-        },
-        "iotHubPartitions": {
-            "type": "int",
-            "minValue": 2,
-            "maxValue": 32,
-            "defaultValue": 2
-        },
         "sendGridApiKey": {
             "type": "string"
         },
-        "toEmail": {
-            "type": "string"
+        "target": {
+            "type": "string",
+            "defaultValue": "pavlo.filipchuk@gmail.com"
         },
-        "fromEmail": {
-            "type": "string"
+        "source": {
+            "type": "string",
+            "defaultValue": "pavlo.filipchuk@gmail.com"
         }
     },
     "variables": {
@@ -120,14 +102,14 @@
                 "eventHubEndpoints": {
                     "events": {
                         "retentionTimeInDays": 1,
-                        "partitionCount": "[parameters('iotHubPartitions')]"
+                        "partitionCount": 2
                     }
                 },
                 "features": "None"
             },
             "sku": {
-                "name": "[first(split(parameters('iotHubSku'), ' '))]",
-                "capacity": "[parameters('iotHubUnits')]"
+                "name": "F1",
+                "capacity": 1
             }
         }
     ],
