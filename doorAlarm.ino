@@ -5,19 +5,24 @@
 #include "LIS2MDLSensor.h"
 #include "OledDisplay.h"
 
-#define DELTA 300
-#define DELAY 500
+#define DELTA 30
+#define MAGNET_INIT_TIME 5
+#define MAGNET_READ_INTERVAL 500
 #define INIT_TIME 5
-#define ALERT_TIME_LIMIT 10
-
-static Timer timer;
+#define SEND_ALERT_TIME 10
+#define DEFAULT_TIMER_INTERVAL 500 // 0.5s
 
 enum STATUS
 {
   Idle,
+  InitMagnet,
   DoorClosed,
   DoorOpened
 };
+
+static Timer timer;
+static Timer initMagnetTimer;
+static Timer sendAlertTimer;
 
 static STATUS status = Idle;
 static bool azureConnected = false;
@@ -32,7 +37,6 @@ static int axes[3];
 void setup()
 {
   Serial.begin(115200);
-
   Screen.init();
   Screen.print(0, "Setup...");
 
@@ -56,7 +60,7 @@ void setup()
   if (lis2mdl->init(NULL) != MAGNETO_OK)
     return;
   Screen.print(3, "Magnetometer OK");
-  Screen.clean();
+  SwitchIdle();
 }
 
 void loop()
@@ -68,6 +72,9 @@ void loop()
     case Idle:
       DoIdle();
       break;
+    case InitMagnet:
+      DoInitMagnet();
+      break;
     case DoorClosed:
       DoDoorClosed();
       break;
@@ -75,8 +82,11 @@ void loop()
       DoDoorOpened();
       break;
     }
+    if (digitalRead(USER_BUTTON_B) == LOW)
+    {
+      SwitchIdle();
+    }
   }
-  delay(DELAY);
 }
 
 static bool CheckWiFi()
@@ -89,87 +99,41 @@ static bool CheckAzureIoT()
   return DevKitMQTTClient_Init();
 }
 
-static void DoIdle()
+static void SwitchIdle()
 {
+  Screen.clean();
   Screen.print(0, "Idle");
   Screen.print(1, "Press A to init magnetometer", true);
+  Screen.print(3, "B to cancel");
+  status = Idle;
+}
+
+static void DoIdle()
+{
   if (digitalRead(USER_BUTTON_A) == LOW)
   {
-    InitializeMagnetometer();
-    status = DoorClosed;
+    SwitchInitMagnet();
   }
+}
+
+static void SwitchDoorClosed()
+{
+  Screen.clean();
+  Screen.print(0, "Door closed");
+  timer.reset();
+  timer.start();
+  status = DoorClosed;
 }
 
 static void DoDoorClosed()
 {
-  Screen.print(0, "Door closed");
-  lis2mdl->getMAxes(axes);
-
-  char buffer[50];
-  
-  sprintf(buffer, "x:  %d", offsets[0] - axes[0]);
-  Screen.print(1, buffer);
-
-  sprintf(buffer, "y:  %d", offsets[1] - axes[1]);
-  Screen.print(2, buffer);
-
-  sprintf(buffer, "z:  %d", offsets[2] - axes[2]);
-  Screen.print(3, buffer);
-
-  if (abs(offsets[0] - axes[0]) > DELTA || abs(offsets[1] - axes[1]) > DELTA || abs(offsets[2] - axes[2]) > DELTA)
+  if (int(timer.read_ms()) > DEFAULT_TIMER_INTERVAL)
   {
-    status = DoorOpened;    
-    messageSent = false;
     timer.reset();
-    timer.start();
-  }
-}
+    lis2mdl->getMAxes(axes);
 
-static void DoDoorOpened()
-{
-  if (digitalRead(USER_BUTTON_B) == LOW)
-  {
-    Screen.clean();
-    timer.stop();
-    status = Idle;
-    return;
-  }
-
-  Screen.print(0, "Door opened!");
-  if (timer.read() <= ALERT_TIME_LIMIT)
-  {
     char buffer[50];
-    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", ALERT_TIME_LIMIT - int(timer.read()));
-    Screen.print(1, buffer, true);
-  }
-  else
-  {
-    if (!messageSent && DevKitMQTTClient_SendEvent("Wild Pikachu appeared"))
-    {
-      messageSent = true;
-      Screen.clean();
-      Screen.print(0, "Alert sent!");
-      timer.stop();
-    }
-  }
-}
 
-static void InitializeMagnetometer()
-{
-  Screen.clean();
-  lis2mdl->getMAxes(axes);
-  offsets[0] = axes[0];
-  offsets[1] = axes[1];
-  offsets[2] = axes[2];
-
-  timer.reset();
-  timer.start();
-  char buffer[50];
-  int delta = 10;
-  while (true)
-  {
-    sprintf(buffer, "Initializing %d", INIT_TIME - int(timer.read()));
-    Screen.print(0, buffer);
     sprintf(buffer, "x:  %d", offsets[0] - axes[0]);
     Screen.print(1, buffer);
 
@@ -178,20 +142,96 @@ static void InitializeMagnetometer()
 
     sprintf(buffer, "z:  %d", offsets[2] - axes[2]);
     Screen.print(3, buffer);
-    delay(DELAY);
-    lis2mdl->getMAxes(axes);
 
-    if (abs(offsets[0] - axes[0]) < delta && abs(offsets[1] - axes[1]) < delta && abs(offsets[2] - axes[2]) < delta)
+    if (abs(offsets[0] - axes[0]) > DELTA || abs(offsets[1] - axes[1]) > DELTA || abs(offsets[2] - axes[2]) > DELTA)
     {
-      if (int(timer.read()) >= INIT_TIME)
+      SwitchDoorOpened();
+    }
+  }
+}
+
+static void SwitchDoorOpened()
+{
+  messageSent = false;
+  Screen.print(0, "Door opened!");
+  timer.reset();
+  timer.start();
+  sendAlertTimer.reset();
+  sendAlertTimer.start();
+  status = DoorOpened;
+}
+
+static void DoDoorOpened()
+{
+  if (timer.read_ms() > DEFAULT_TIMER_INTERVAL)
+  {
+    timer.reset();
+    char buffer[50];
+    sprintf(buffer, "Press B in %d seconds to turn off the alarm!", SEND_ALERT_TIME - int(sendAlertTimer.read()));
+    Screen.print(1, buffer, true);
+  }
+  if (sendAlertTimer.read() > SEND_ALERT_TIME)
+  {
+    if (!messageSent && DevKitMQTTClient_SendEvent("Wild Pikachu appeared"))
+    {
+      messageSent = true;
+      Screen.clean();
+      Screen.print(0, "Alert sent!");
+      timer.stop();
+      timer.reset();
+    }
+  }
+}
+
+static void SwitchInitMagnet()
+{
+  Screen.clean();
+  char buffer[20];
+  sprintf(buffer, "Initializing %ds", MAGNET_INIT_TIME);
+  Screen.print(0, buffer);
+  Screen.print(1, "x:");
+  Screen.print(2, "y:");
+  Screen.print(3, "z:");
+  lis2mdl->getMAxes(axes);
+  offsets[0] = axes[0];
+  offsets[1] = axes[1];
+  offsets[2] = axes[2];
+  initMagnetTimer.reset();
+  initMagnetTimer.start();
+  timer.reset();
+  timer.start();
+  status = InitMagnet;
+}
+
+static void DoInitMagnet()
+{
+  if (timer.read_ms() > DEFAULT_TIMER_INTERVAL)
+  {
+    timer.reset();
+    lis2mdl->getMAxes(axes);
+    if (abs(offsets[0] - axes[0]) < DELTA && abs(offsets[1] - axes[1]) < DELTA && abs(offsets[2] - axes[2]) < DELTA)
+    {
+      if (int(initMagnetTimer.read()) >= MAGNET_INIT_TIME)
       {
-        timer.stop();
-        break;
+        initMagnetTimer.stop();
+        SwitchDoorClosed();
+        return;
       }
+      char buffer[20];
+      sprintf(buffer, "Initializing %ds", MAGNET_INIT_TIME - int(initMagnetTimer.read()));
+      Screen.print(0, buffer);
+      sprintf(buffer, "x:  %d", offsets[0] - axes[0]);
+      Screen.print(1, buffer);
+
+      sprintf(buffer, "y:  %d", offsets[1] - axes[1]);
+      Screen.print(2, buffer);
+
+      sprintf(buffer, "z:  %d", offsets[2] - axes[2]);
+      Screen.print(3, buffer);
     }
     else
     {
-      timer.reset();
+      initMagnetTimer.reset();
       offsets[0] = axes[0];
       offsets[1] = axes[1];
       offsets[2] = axes[2];

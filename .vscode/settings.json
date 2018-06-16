@@ -10,5 +10,6 @@
     "cstdlib": "cpp"
   },
   "azureFunctions.projectRuntime": "~1",
-  "azureFunctions.projectLanguage": "C#"
+  "azureFunctions.projectLanguage": "C#",
+  "C_Cpp.intelliSenseEngineFallback": "Enabled"
 }
